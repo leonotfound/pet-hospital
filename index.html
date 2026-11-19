@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#5eead4">
+<title>李大师萌宠医院 · 宠物医院模拟器</title>
+<style>
+:root{
+  --bg1:#0f766e; --bg2:#0d9488; --card:#ffffff; --ink:#134e4a;
+  --accent:#fb7185; --gold:#f59e0b; --mint:#14b8a6; --line:#e2e8f0;
+  --shadow:0 6px 20px rgba(0,0,0,.18);
+  --r:18px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:linear-gradient(160deg,#0f766e 0%,#0d9488 45%,#14b8a6 100%);
+  color:var(--ink); overflow:hidden; user-select:none; -webkit-user-select:none;
+}
+#app{
+  position:relative; max-width:480px; margin:0 auto; height:100%;
+  display:flex; flex-direction:column; background:linear-gradient(180deg,#ccfbf1 0%,#f0fdfa 60%,#ecfeff 100%);
+  box-shadow:0 0 40px rgba(0,0,0,.25); overflow:hidden;
+}
+/* ===== 顶栏 ===== */
+#header{
+  display:flex; align-items:center; gap:8px; padding:12px 14px 8px;
+  background:linear-gradient(135deg,#0f766e,#14b8a6); color:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.15); z-index:5; flex:none;
+}
+.stat{display:flex; align-items:center; gap:5px; font-weight:700; font-size:14px;}
+.stat .ic{font-size:17px;}
+#header .spacer{flex:1;}
+#money{background:rgba(255,255,255,.16); padding:5px 10px; border-radius:20px; font-size:15px;}
+#rep{font-size:13px; opacity:.95;}
+#daybox{background:rgba(255,255,255,.16); padding:5px 10px; border-radius:20px; font-size:13px; font-weight:700;}
+/* ===== 横幅 ===== */
+#banner{
+  margin:10px 12px 0; padding:11px 14px; border-radius:14px;
+  background:#fff; box-shadow:var(--shadow); flex:none;
+  display:flex; align-items:center; gap:10px; min-height:54px;
+}
+#banner .goal-ic{font-size:26px;}
+#banner .goal-box{flex:1; min-width:0;}
+#banner .goal-txt{font-size:13px; line-height:1.45; color:#475569;}
+#banner .goal-txt b{color:var(--accent);}
+#goalbar{height:7px; background:#e2e8f0; border-radius:10px; margin-top:6px; overflow:hidden;}
+#goalbar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,#fb7185,#f59e0b); border-radius:10px; transition:width .3s;}
+/* ===== 滚动区 ===== */
+#scroll{flex:1; overflow-y:auto; padding:10px 12px 20px; -webkit-overflow-scrolling:touch;}
+.section-title{font-size:13px; font-weight:800; color:#0f766e; margin:10px 2px 8px; display:flex; align-items:center; gap:6px;}
+.section-title .num{background:#14b8a6; color:#fff; border-radius:10px; font-size:11px; padding:1px 7px;}
+/* ===== 诊室 ===== */
+#rooms{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.room{
+  background:#fff; border-radius:var(--r); box-shadow:var(--shadow); padding:12px;
+  display:flex; flex-direction:column; gap:6px; position:relative; overflow:hidden;
+  min-height:96px; transition:transform .1s;
+}
+.room.locked{background:#f1f5f9; opacity:.85;}
+.room .r-top{display:flex; align-items:center; gap:7px;}
+.room .r-ic{font-size:26px;}
+.room .r-name{font-weight:800; font-size:14px; color:var(--ink);}
+.room .r-lv{font-size:10px; color:#64748b; margin-left:auto; background:#f1f5f9; border-radius:8px; padding:2px 6px;}
+.room .r-sub{font-size:10.5px; color:#94a3b8; line-height:1.3;}
+.room .slots{display:flex; gap:5px; flex-wrap:wrap;}
+.slot{width:36px; height:36px; border-radius:10px; background:#f8fafc; border:2px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:20px; position:relative;}
+.slot.full{border-style:solid; border-color:#14b8a6; background:#ecfeff;}
+.slot .pbar{position:absolute; bottom:-1px; left:0; right:0; height:4px; background:#e2e8f0; border-radius:0 0 8px 8px; overflow:hidden;}
+.slot .pbar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,#14b8a6,#34d399);}
+.slot .heart{position:absolute; top:-8px; right:-6px; font-size:15px; animation:pop .4s ease;}
+.room.locked .r-lock{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:12px; color:#64748b; background:rgba(241,245,249,.7); cursor:pointer;}
+.room.locked .r-lock .lk{font-size:26px;}
+/* ===== 候诊大厅 ===== */
+#queue{display:flex; flex-direction:column; gap:8px;}
+.pet{
+  background:#fff; border-radius:14px; box-shadow:var(--shadow); padding:10px 12px;
+  display:flex; align-items:center; gap:10px; animation:slidein .35s ease;
+}
+@keyframes slidein{from{transform:translateX(-40px); opacity:0;} to{transform:none; opacity:1;}}
+.pet .avatar{width:46px; height:46px; border-radius:12px; background:#ecfeff; display:flex; align-items:center; justify-content:center; font-size:30px; position:relative; flex:none;}
+.pet .avatar .dz{position:absolute; bottom:-4px; right:-4px; font-size:16px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.2));}
+.pet .info{flex:1; min-width:0;}
+.pet .info .nm{font-weight:700; font-size:13.5px; color:var(--ink);}
+.pet .info .dz-name{font-size:11px; color:#64748b; margin-top:1px;}
+.pet .patience{height:6px; background:#e2e8f0; border-radius:8px; margin-top:5px; overflow:hidden;}
+.pet .patience i{display:block; height:100%; border-radius:8px; transition:width .2s linear;}
+.pat-ok{background:linear-gradient(90deg,#34d399,#10b981);}
+.pat-mid{background:linear-gradient(90deg,#fbbf24,#f59e0b);}
+.pat-low{background:linear-gradient(90deg,#fb7185,#ef4444);}
+.pet .lock-tag{margin-left:auto; font-size:10.5px; color:#ef4444; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:3px 7px; white-space:nowrap;}
+.pet .lock-tag.lockable{color:#b45309; background:#fffbeb; border-color:#fde68a;}
+.pet .bubble{margin-left:auto; font-size:11px; color:#0f766e; background:#ccfbf1; border-radius:10px; padding:4px 8px; white-space:nowrap; font-weight:600;}
+.empty-hint{text-align:center; color:#94a3b8; font-size:12.5px; padding:18px 0;}
+/* ===== 底栏 ===== */
+#bottom{
+  flex:none; display:flex; gap:10px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:#fff; border-top:1px solid var(--line); box-shadow:0 -2px 10px rgba(0,0,0,.06); z-index:5;
+}
+.big-btn{
+  flex:1; border:none; border-radius:14px; padding:12px; font-size:15px; font-weight:800; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:6px; color:#fff;
+  box-shadow:0 4px 12px rgba(0,0,0,.15); transition:transform .08s;
+}
+.big-btn:active{transform:scale(.96);}
+#btnShop{background:linear-gradient(135deg,#f59e0b,#f97316);}
+#btnReport{background:linear-gradient(135deg,#0ea5e9,#2563eb);}
+/* ===== 弹窗 ===== */
+.modal{
+  position:absolute; inset:0; background:rgba(15,23,42,.55); z-index:50;
+  display:flex; align-items:flex-end; justify-content:center; animation:fadein .2s;
+}
+@keyframes fadein{from{opacity:0;} to{opacity:1;}}
+.modal .sheet{
+  width:100%; max-width:480px; background:#f8fafc; border-radius:22px 22px 0 0;
+  max-height:86%; overflow-y:auto; padding:18px 16px calc(16px + env(safe-area-inset-bottom));
+  animation:up .25s ease;
+}
+@keyframes up{from{transform:translateY(40px); opacity:0;} to{transform:none; opacity:1;}}
+.sheet h2{font-size:17px; color:var(--ink); display:flex; align-items:center; gap:8px; margin-bottom:4px;}
+.sheet .sub{font-size:12px; color:#64748b; margin-bottom:12px;}
+.sheet .close{position:sticky; top:0; float:right; background:#e2e8f0; border:none; width:30px; height:30px; border-radius:50%; font-size:15px; cursor:pointer; color:#475569;}
+.shop-item{
+  background:#fff; border-radius:14px; padding:12px; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,.06);
+  display:flex; align-items:center; gap:12px;
+}
+.shop-item .s-ic{font-size:30px; flex:none;}
+.shop-item .s-info{flex:1; min-width:0;}
+.shop-item .s-name{font-weight:800; font-size:14px; color:var(--ink);}
+.shop-item .s-desc{font-size:11.5px; color:#64748b; line-height:1.4; margin-top:2px;}
+.shop-item .buy{
+  border:none; border-radius:12px; padding:9px 13px; font-weight:800; font-size:13px; cursor:pointer; color:#fff; flex:none;
+  background:linear-gradient(135deg,#14b8a6,#0d9488); box-shadow:0 3px 8px rgba(20,184,166,.3);
+}
+.shop-item .buy:disabled{background:#cbd5e1; box-shadow:none; cursor:not-allowed; color:#94a3b8;}
+.shop-item .buy:active:not(:disabled){transform:scale(.95);}
+.shop-item.maxed .buy{background:#e2e8f0; color:#64748b; box-shadow:none;}
+#reportBody{display:flex; flex-direction:column; gap:10px;}
+.rp-row{background:#fff; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(0,0,0,.06); display:flex; align-items:center; gap:12px;}
+.rp-row .ri{font-size:28px;}
+.rp-row .rt{flex:1;}
+.rp-row .rn{font-weight:800; font-size:14px;}
+.rp-row .rv{font-size:11.5px; color:#64748b;}
+.rp-row .num{font-weight:800; font-size:18px; color:var(--mint);}
+/* ===== 漂浮字 ===== */
+#floaters{position:absolute; inset:0; pointer-events:none; z-index:40; overflow:hidden;}
+.floater{position:absolute; font-weight:800; font-size:16px; animation:floatup 1.2s ease forwards; white-space:nowrap;}
+@keyframes floatup{from{transform:translateY(0); opacity:1;} to{transform:translateY(-70px); opacity:0;}}
+.floater.gold{color:#d97706;}
+.floater.green{color:#059669;}
+.floater.red{color:#ef4444;}
+/* ===== 事件弹条 ===== */
+#toast{
+  position:absolute; top:70px; left:50%; transform:translateX(-50%); z-index:60;
+  background:#1e293b; color:#fff; padding:10px 16px; border-radius:20px; font-size:13px; font-weight:600;
+  box-shadow:0 6px 20px rgba(0,0,0,.3); opacity:0; pointer-events:none; transition:opacity .3s, transform .3s; max-width:88%; text-align:center;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+/* ===== 开场 ===== */
+#intro{
+  position:absolute; inset:0; background:rgba(15,23,42,.72); z-index:80; display:flex; align-items:center; justify-content:center; padding:20px;
+}
+#intro .card{background:#fff; border-radius:24px; padding:24px 20px; max-width:360px; width:100%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.4); animation:up .35s ease;}
+#intro .logo{font-size:56px; margin-bottom:4px;}
+#intro h1{font-size:22px; color:var(--ink);}
+#intro .tag{color:#0f766e; font-size:13px; font-weight:600; margin:2px 0 14px;}
+#intro .how{text-align:left; font-size:13px; color:#475569; line-height:1.9; margin-bottom:18px;}
+#intro .how b{color:var(--accent);}
+#startBtn{
+  width:100%; border:none; border-radius:16px; padding:14px; font-size:17px; font-weight:800; color:#fff; cursor:pointer;
+  background:linear-gradient(135deg,#14b8a6,#0d9488); box-shadow:0 6px 16px rgba(20,184,166,.4);
+}
+#startBtn:active{transform:scale(.97);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="stat" id="money"><span class="ic">💰</span><span id="moneyVal">0</span></div>
+    <div class="stat" id="rep"><span class="ic">⭐</span><span id="repVal">50</span></div>
+    <div class="spacer"></div>
+    <div id="daybox">📅 第 <span id="dayVal">1</span> 天</div>
+  </div>
+
+  <div id="banner">
+    <div class="goal-ic">🎯</div>
+    <div class="goal-box">
+      <div class="goal-txt" id="goalTxt">今日目标加载中…</div>
+      <div id="goalbar"><i></i></div>
+    </div>
+  </div>
+
+  <div id="scroll">
+    <div class="section-title">🩺 诊室 <span class="num" id="roomCount"></span></div>
+    <div id="rooms"></div>
+
+    <div class="section-title">🚑 候诊大厅 <span class="num" id="queueCount"></span></div>
+    <div id="queue"></div>
+    <div style="height:8px"></div>
+  </div>
+
+  <div id="bottom">
+    <button class="big-btn" id="btnShop">🏪 商店</button>
+    <button class="big-btn" id="btnHelp">❓ 玩法</button>
+    <button class="big-btn" id="btnReport">📊 报告</button>
+  </div>
+
+  <div id="floaters"></div>
+  <div id="toast"></div>
+
+  <div id="modalRoot"></div>
+
+  <div id="intro">
+    <div class="card">
+      <div class="logo">🐶🩺🐱</div>
+      <h1>李大师萌宠医院</h1>
+      <div class="tag">宠物医院模拟器 · 致敬《双点医院》</div>
+      <div class="how">
+        🐾 生病的宠物会自己上门排队<br>
+        🩺 有空诊室时<b>自动接诊治疗</b><br>
+        👆 点击治疗中的宠物可<b>加速治疗</b><br>
+        💰 治愈赚金币，<b>解锁专科诊室</b>、升级、雇护士<br>
+        ⏳ 宠物<b>耐心耗尽会生气离开</b>，扣名声哦
+      </div>
+      <button id="startBtn">开张营业 🏥</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 数据定义 ================= */
+const PETS = [
+  {e:'🐶',n:'旺财'},{e:'🐱',n:'咪咪'},{e:'🐰',n:'球球'},{e:'🐹',n:'土豆'},
+  {e:'🦊',n:'狐小狸'},{e:'🐻',n:'壮壮'},{e:'🐼',n:'滚滚'},{e:'🐨',n:'考拉'},
+  {e:'🐯',n:'虎妞'},{e:'🦁',n:'狮心'},{e:'🐷',n:'八戒'},{e:'🐸',n:'呱呱'},
+  {e:'🐵',n:'悟空'},{e:'🦄',n:'独角兽'},{e:'🐢',n:'慢慢'},{e:'🦜',n:'叽叽'},
+  {e:'🐔',n:'咯咯'},{e:'🐟',n:'泡泡'}
+];
+
+const DISEASES = [
+  {id:'cold',   name:'喷嚏综合征', icon:'🤧', room:'general',  base:4,  reward:30, cure:'打完喷嚏疫苗，痊愈啦！'},
+  {id:'mood',   name:'恋爱忧郁症', icon:'🥺', room:'general',  base:3.5,reward:32, cure:'心结解开，重拾笑容！'},
+  {id:'insomnia',name:'夜猫子失眠', icon:'🐑', room:'general',  base:3,  reward:28, cure:'数羊成功，睡个好觉！'},
+  {id:'broken', name:'腿软骨折',   icon:'🦴', room:'ortho',    base:8,  reward:60, cure:'打上石膏，骨头长好啦！'},
+  {id:'shedding',name:'疯狂掉毛',  icon:'💇', room:'beauty',   base:5,  reward:46, cure:'毛发焕然一新！'},
+  {id:'parasite',name:'寄生虫派对',icon:'🐛', room:'deworm',   base:7,  reward:55, cure:'小虫虫统统赶跑！'},
+  {id:'tooth',  name:'蛀牙危机',   icon:'🦷', room:'dental',   base:6,  reward:50, cure:'一口小白牙，闪亮！'},
+  {id:'obese',  name:'圆滚滚肥胖', icon:'🍔', room:'nutrition',base:9,  reward:72, cure:'科学减重，轻盈起飞！'}
+];
+
+const ROOM_DEFS = [
+  {id:'general',  name:'综合诊室', icon:'🏥', cost:0,   desc:'治疗喷嚏、忧郁、失眠等常见小病'},
+  {id:'ortho',    name:'骨科',     icon:'🦴', cost:300, desc:'专治腿软骨折'},
+  {id:'beauty',   name:'美容室',   icon:'💇', cost:350, desc:'专治疯狂掉毛'},
+  {id:'deworm',   name:'驱虫室',   icon:'🐛', cost:400, desc:'专治寄生虫派对'},
+  {id:'dental',   name:'牙科',     icon:'🦷', cost:500, desc:'专治蛀牙危机'},
+  {id:'nutrition',name:'营养科',   icon:'🥗', cost:650, desc:'专治圆滚滚肥胖'}
+];
+
+/* ================= 游戏状态 ================= */
+let G = null;
+function freshState(){
+  return {
+    money: 150, reputation: 50, day: 1, nurses: 0,
+    cured: 0, total: 0, earned: 0, lost: 0,
+    rooms: { general: {lv:1} },
+    queue: [], treating: [],
+    goal: {type:'cure', target:3, done:0, reward:120},
+    goalDone: false,
+    spawnTimer: 1.5, dayTimer: 0, dayLen: 55,
+    eventActive: null, eventTimer: 0,
+    petSeq: 1,
+    unlockedTeaser: false
+  };
+}
+
+function roomLv(id){ return (G.rooms[id] && G.rooms[id].lv) || 0; }
+function roomUnlocked(id){ return roomLv(id) > 0; }
+
+/* ================= 工具 ================= */
+const $ = s => document.querySelector(s);
+function fmt(n){ return Math.floor(n).toLocaleString('zh-CN'); }
+function rnd(a,b){ return a + Math.random()*(b-a); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function weighted(items){ // items: [{w:number}]
+  const total = items.reduce((s,i)=>s+i.w,0);
+  let r = Math.random()*total;
+  for(const it of items){ r -= it.w; if(r<=0) return it; }
+  return items[items.length-1];
+}
+
+/* ================= 治疗相关 ================= */
+function nurseSpeed(){ return 1 + G.nurses*0.22; }
+function roomSpeed(id){ const lv = roomLv(id); return 1 + (lv-1)*0.15; }
+function slotCount(id){ return 1 + (roomLv(id)-1); } // 每升一级 +1 接诊位
+
+function diseaseRoom(id){ const d = DISEASES.find(x=>x.id===id); return d.room; }
+
+/* ================= 生成宠物 ================= */
+function availableDiseasePool(){
+  const pool = [];
+  DISEASES.forEach(d=>{
+    if(roomUnlocked(d.room)) pool.push({d, w: d.id==='cold'?20: d.id==='mood'?16: d.id==='insomnia'?12: 10});
+  });
+  // 从第3天起，偶尔刷出"未解锁专科"的病例作为解锁提示
+  const locked = DISEASES.filter(d=>!roomUnlocked(d.room));
+  if(G.day >= 3 && locked.length){
+    const w = Math.min(6, (G.day-2)*2);
+    const d = pick(locked);
+    pool.push({d, w});
+  }
+  if(pool.length===0){ // 兜底
+    pool.push({d: DISEASES[0], w:1});
+  }
+  return pool;
+}
+
+function spawnPet(){
+  const p = pick(PETS);
+  const {d} = weighted(availableDiseasePool());
+  G.queue.push({
+    id: G.petSeq++, e:p.e, n:p.n, dz:d.id, dzName:d.name, dzIcon:d.icon,
+    patience: 100, reward: d.reward, base: d.base, room: d.room
+  });
+  G.total++;
+  renderAll();
+}
+
+/* ================= 主循环 ================= */
+let lastTime = Date.now();
+function update(dt){
+  if(!G || G.paused) return;
+  // 到访
+  G.spawnTimer -= dt;
+  if(G.spawnTimer <= 0){
+    spawnPet();
+    let base = Math.max(2.2, 5.5 - (G.day-1)*0.35);
+    if(G.eventActive === 'rush') base *= 0.4; // 急诊潮：到访间隔缩短
+    G.spawnTimer = base * rnd(0.7,1.3);
+  }
+  // 候诊耐心下降
+  const patienceRate = (G.eventActive === 'quiet') ? 3.2 * 0.4 : 3.2; // 午休：耐心下降变慢
+  for(let i=G.queue.length-1;i>=0;i--){
+    const p = G.queue[i];
+    p.patience -= dt * patienceRate;
+    if(p.patience <= 0){
+      G.queue.splice(i,1);
+      G.lost++;
+      G.reputation = Math.max(0, G.reputation - 3);
+      floater(p, '💢 气走了', 'red');
+      renderAll();
+    }
+  }
+  // 治疗进度
+  for(let i=G.treating.length-1;i>=0;i--){
+    const t = G.treating[i];
+    t.progress += dt * (1 / (t.base / (roomSpeed(t.room) * nurseSpeed())));
+    if(t.progress >= 1){
+      G.treating.splice(i,1);
+      completeTreatment(t);
+    }
+  }
+  // 每日目标
+  if(!G.goalDone){
+    G.dayTimer += dt;
+    const achieved = G.goal.type==='cure'
+      ? G.goal.done >= G.goal.target
+      : (G.earned - (G.goalStartEarn||0)) >= G.goal.target;
+    if(achieved) completeGoal(true);
+    else if(G.dayTimer >= G.dayLen) completeGoal(false);
+  }
+  // 事件计时
+  if(G.eventActive){
+    G.eventTimer -= dt;
+    if(G.eventTimer <= 0){
+      G.eventActive = null;
+      toast('事件结束，恢复常态', '⏱️');
+    }
+  }
+  refreshBars();
+}
+
+function completeTreatment(t){
+  let reward = t.reward;
+  if(G.eventActive === 'double') reward *= 2;
+  G.money += reward;
+  G.earned += reward;
+  G.cured++;
+  G.reputation = Math.min(100, G.reputation + (G.eventActive === 'vip' ? 3 : 1));
+  if(!G.goalDone && G.goal.type==='cure'){ G.goal.done++; }
+  if(G.goal.type==='money'){ /* money goal checks in update */ }
+  floater(t, `+💰${fmt(reward)}`, 'gold');
+  toast(DISEASES.find(d=>d.id===t.dz).cure, '🎉');
+  maybeEvent();
+  renderAll();
+  save();
+}
+
+/* 加速：点击治疗中的宠物 */
+function boost(t){
+  if(!t) return;
+  t.progress += 0.22; // 点击一下推进 22%
+  t.boosts = (t.boosts||0)+1;
+  if(t.progress >= 1){
+    const idx = G.treating.indexOf(t);
+    if(idx>=0){ G.treating.splice(idx,1); completeTreatment(t); return; }
+  }
+  floater(t, '❤️', 'green');
+  refreshBars();
+}
+
+/* ================= 每日目标 ================= */
+function setGoal(){
+  const types = ['cure','money'];
+  const type = G.day <= 2 ? 'cure' : pick(types);
+  if(type==='cure'){
+    G.goal = {type:'cure', target: 2 + G.day, done:0, reward: 100 + G.day*20};
+  }else{
+    const target = 100 + G.day*40;
+    G.goal = {type:'money', target, done:0, reward: Math.round(target*0.8)};
+    G.goalStartEarn = G.earned;
+  }
+  G.goalDone = false;
+  G.dayTimer = 0;
+}
+function completeGoal(ok){
+  if(G.goalDone) return;
+  G.goalDone = true;
+  if(ok){
+    G.money += G.goal.reward;
+    G.reputation = Math.min(100, G.reputation + 5);
+    toast(`今日目标达成！奖励 💰${fmt(G.goal.reward)}`, '🏆');
+    floater(null, '🏆 目标达成！', 'gold');
+  }else{
+    toast('今天目标没完成…明天加油！', '😿');
+  }
+  nextDay();
+}
+function nextDay(){
+  G.day++;
+  setGoal();
+  renderAll();
+  save();
+}
+
+/* ================= 随机事件 ================= */
+function maybeEvent(){
+  if(G.eventActive) return;
+  if(Math.random() < 0.18){
+    const ev = pick(['double','rush','vip','quiet']);
+    G.eventActive = ev;
+    G.eventTimer = 12;
+    const msg = {
+      double:'💎 大客户驾到！12秒内收入翻倍',
+      rush:'🚨 急诊潮！宠物到访速度提升',
+      vip:'⭐ VIP 就诊，名声快速上涨',
+      quiet:'🌙 午休时间，宠物耐心下降变慢'
+    }[ev];
+    toast(msg, '✨');
+    // 急诊潮：加快刷新
+    if(ev==='rush') G.spawnTimer = 0.3;
+  }
+}
+
+/* ================= 渲染 ================= */
+function renderAll(){
+  renderHeader();
+  renderGoal();
+  renderRooms();
+  renderQueue();
+}
+function renderHeader(){
+  $('#moneyVal').textContent = fmt(G.money);
+  $('#repVal').textContent = Math.round(G.reputation);
+  $('#dayVal').textContent = G.day;
+}
+function renderGoal(){
+  const g = G.goal;
+  let txt, pct;
+  if(g.type==='cure'){
+    txt = `今日目标：治愈 <b>${g.done}/${g.target}</b> 只宠物（奖励 💰${g.reward}）`;
+    pct = Math.min(100, g.done/g.target*100);
+  }else{
+    const cur = G.earned - (G.goalStartEarn||0);
+    txt = `今日目标：赚取 <b>💰${fmt(cur)}/${fmt(g.target)}</b>（奖励 💰${g.reward}）`;
+    pct = Math.min(100, cur/g.target*100);
+  }
+  $('#goalTxt').innerHTML = (G.goalDone ? '✅ 今日目标已达成，进入下一天…' : txt);
+  $('#goalbar i').style.width = pct + '%';
+}
+function renderRooms(){
+  const el = $('#rooms');
+  let html = '';
+  let unlockedCount = 0;
+  ROOM_DEFS.forEach(rd=>{
+    const unlocked = roomUnlocked(rd.id);
+    if(unlocked) unlockedCount++;
+    const lv = roomLv(rd.id);
+    const slots = unlocked ? slotCount(rd.id) : 1;
+    let slotHtml = '';
+    for(let i=0;i<slots;i++){
+      const t = G.treating.find(x=>x.room===rd.id && x.slot===i);
+      if(t){
+        slotHtml += `<div class="slot full" id="slot-${t.id}">${t.e}<div class="pbar"><i id="pp-${t.id}"></i></div></div>`;
+      }else{
+        slotHtml += `<div class="slot"></div>`;
+      }
+    }
+    html += `<div class="room ${unlocked?'':'locked'}" id="room-${rd.id}" data-room="${rd.id}">
+      <div class="r-top"><span class="r-ic">${rd.icon}</span><span class="r-name">${rd.name}</span>
+      ${unlocked?`<span class="r-lv">Lv.${lv}</span>`:''}</div>
+      ${unlocked?`<div class="r-sub">速度 +${Math.round((roomSpeed(rd.id)-1)*100)}% · 接诊位 ${slots}</div>`:''}
+      <div class="slots">${slotHtml}</div>
+      ${unlocked?'':`<div class="r-lock" id="unlock-${rd.id}"><span class="lk">🔒</span><span>💰${rd.cost} 解锁</span></div>`}
+    </div>`;
+  });
+  el.innerHTML = html;
+  $('#roomCount').textContent = unlockedCount + '/' + ROOM_DEFS.length;
+  // 绑定
+  ROOM_DEFS.forEach(rd=>{
+    if(!roomUnlocked(rd.id)){
+      const b = $('#unlock-'+rd.id);
+      if(b) b.onclick = ()=>buyRoom(rd.id);
+    }
+  });
+  // 绑定治疗中宠物点击加速
+  G.treating.forEach(t=>{
+    const s = $('#slot-'+t.id);
+    if(s) s.onclick = ()=>boost(t);
+  });
+}
+function renderQueue(){
+  const el = $('#queue');
+  if(G.queue.length===0){
+    el.innerHTML = `<div class="empty-hint">🐾 没有候诊的宠物，正在招揽客人…</div>`;
+  }else{
+    let html = '';
+    G.queue.forEach(p=>{
+      const pct = Math.max(0, p.patience);
+      const cls = pct>60?'pat-ok':(pct>30?'pat-mid':'pat-low');
+      let right;
+      if(!roomUnlocked(p.room)){
+        const rd = ROOM_DEFS.find(r=>r.id===p.room);
+        right = `<span class="lock-tag lockable" id="q-unlock-${p.id}">🔒 需${rd.name}</span>`;
+      }else{
+        right = `<span class="bubble">${DISEASES.find(d=>d.id===p.dz).room===p.room?'等待接诊':'排队中'}</span>`;
+      }
+      html += `<div class="pet" id="qpet-${p.id}">
+        <div class="avatar">${p.e}<span class="dz">${p.dzIcon}</span></div>
+        <div class="info">
+          <div class="nm">${p.n}</div>
+          <div class="dz-name">${p.dzName}</div>
+          <div class="patience"><i class="${cls}" id="pat-${p.id}"></i></div>
+        </div>
+        ${right}
+      </div>`;
+    });
+    el.innerHTML = html;
+    G.queue.forEach(p=>{
+      if(!roomUnlocked(p.room)){
+        const b = $('#q-unlock-'+p.id);
+        if(b) b.onclick = ()=>openShop();
+      }
+    });
+  }
+  $('#queueCount').textContent = G.queue.length;
+}
+
+function refreshBars(){
+  G.treating.forEach(t=>{
+    const bar = $('#pp-'+t.id);
+    if(bar) bar.style.width = Math.min(100, t.progress*100) + '%';
+  });
+  G.queue.forEach(p=>{
+    const bar = $('#pat-'+p.id);
+    if(bar){
+      const pct = Math.max(0,p.patience);
+      bar.style.width = pct + '%';
+      bar.className = pct>60?'pat-ok':(pct>30?'pat-mid':'pat-low');
+    }
+  });
+  // money goal 进度刷新
+  if(G.goal.type==='money') renderGoal();
+}
+
+/* ================= 接诊调度 ================= */
+function assignQueue(){
+  // 在 update 里已触发 render，这里简化：每次 update 结束后尝试接诊
+  for(const p of G.queue.slice()){
+    const roomId = p.room;
+    if(!roomUnlocked(roomId)) continue;
+    const cap = slotCount(roomId);
+    const used = G.treating.filter(t=>t.room===roomId).length;
+    if(used >= cap) continue;
+    const slot = firstFreeSlot(roomId, cap);
+    const idx = G.queue.indexOf(p);
+    G.queue.splice(idx,1);
+    const t = { ...p, room: roomId, slot, progress:0, boosts:0 };
+    G.treating.push(t);
+    renderAll();
+    break;
+  }
+}
+function firstFreeSlot(roomId, cap){
+  const usedSlots = G.treating.filter(t=>t.room===roomId).map(t=>t.slot);
+  for(let i=0;i<cap;i++) if(!usedSlots.includes(i)) return i;
+  return 0;
+}
+
+/* ================= 商店 ================= */
+function nurseCost(){ return Math.round(150 * Math.pow(1.8, G.nurses)); }
+function roomUpgradeCost(id){ return Math.round(150 * roomLv(id)); }
+
+function openShop(){
+  const rd = ROOM_DEFS;
+  let html = `<div class="sheet"><button class="close" id="shopClose">✕</button>
+    <h2>🏪 医院商店</h2><div class="sub">金币 💰${fmt(G.money)}</div>`;
+  // 护士
+  html += `<div class="shop-item">
+    <span class="s-ic">👩‍⚕️</span>
+    <div class="s-info"><div class="s-name">雇佣护士（${G.nurses} 名）</div>
+    <div class="s-desc">全体治疗速度 +22%（当前 +${Math.round((nurseSpeed()-1)*100)}%）</div></div>
+    <button class="buy" id="buy-nurse" ${G.money<nurseCost()?'disabled':''}>💰${fmt(nurseCost())}</button>
+  </div>`;
+  // 房间
+  rd.forEach(r=>{
+    const unlocked = roomUnlocked(r.id);
+    const lv = roomLv(r.id);
+    if(!unlocked){
+      html += `<div class="shop-item">
+        <span class="s-ic">${r.icon}</span>
+        <div class="s-info"><div class="s-name">解锁「${r.name}」</div>
+        <div class="s-desc">${r.desc}</div></div>
+        <button class="buy" id="buy-room-${r.id}" ${G.money<r.cost?'disabled':''}>💰${fmt(r.cost)}</button>
+      </div>`;
+    }else{
+      const cost = roomUpgradeCost(r.id);
+      html += `<div class="shop-item">
+        <span class="s-ic">${r.icon}</span>
+        <div class="s-info"><div class="s-name">升级「${r.name}」Lv.${lv} → Lv.${lv+1}</div>
+        <div class="s-desc">+1 接诊位 · 速度 +15%</div></div>
+        <button class="buy" id="buy-room-${r.id}" ${G.money<cost?'disabled':''}>💰${fmt(cost)}</button>
+      </div>`;
+    }
+  });
+  html += `</div>`;
+  $('#modalRoot').innerHTML = `<div class="modal" id="shopModal">${html}</div>`;
+  $('#shopClose').onclick = closeModal;
+  $('#buy-nurse').onclick = ()=>buyNurse();
+  rd.forEach(r=>{
+    const b = $('#buy-room-'+r.id);
+    if(b) b.onclick = ()=>buyRoom(r.id);
+  });
+}
+function buyNurse(){
+  const c = nurseCost();
+  if(G.money < c){ toast('金币不够啦', '😿'); return; }
+  G.money -= c; G.nurses++;
+  toast('雇佣了一名护士！治疗加速', '👩‍⚕️');
+  openShop(); save(); renderHeader();
+}
+function buyRoom(id){
+  const rd = ROOM_DEFS.find(r=>r.id===id);
+  const unlocked = roomUnlocked(id);
+  const cost = unlocked ? roomUpgradeCost(id) : rd.cost;
+  if(G.money < cost){ toast('金币不够啦', '😿'); return; }
+  G.money -= cost;
+  if(!unlocked){ G.rooms[id] = {lv:1}; toast(`解锁了「${rd.name}」！`, rd.icon); }
+  else { G.rooms[id].lv++; toast(`「${rd.name}」升级到 Lv.${G.rooms[id].lv}！`, rd.icon); }
+  openShop(); save(); renderAll();
+}
+function openReport(){
+  const treat = G.treating.length;
+  const wait = G.queue.length;
+  let html = `<div class="sheet"><button class="close" id="repClose">✕</button>
+    <h2>📊 经营报告</h2><div class="sub">第 ${G.day} 天 · 口碑 ${Math.round(G.reputation)}</div>
+    <div id="reportBody">
+      <div class="rp-row"><span class="ri">💰</span><div class="rt"><div class="rn">累计收入</div><div class="rv">开张以来赚到的金币</div></div><span class="num">${fmt(G.earned)}</span></div>
+      <div class="rp-row"><span class="ri">💊</span><div class="rt"><div class="rn">治愈宠物</div><div class="rv">成功出院的小患者</div></div><span class="num">${G.cured}</span></div>
+      <div class="rp-row"><span class="ri">🚪</span><div class="rt"><div class="rn">接诊总量</div><div class="rv">累计到访的宠物</div></div><span class="num">${G.total}</span></div>
+      <div class="rp-row"><span class="ri">💢</span><div class="rt"><div class="rn">气走宠物</div><div class="rv">耐心耗尽离开的</div></div><span class="num">${G.lost}</span></div>
+      <div class="rp-row"><span class="ri">🩺</span><div class="rt"><div class="rn">正在治疗</div><div class="rv">当前住院患者</div></div><span class="num">${treat}</span></div>
+      <div class="rp-row"><span class="ri">⏳</span><div class="rt"><div class="rn">候诊人数</div><div class="rv">排队等待的宠物</div></div><span class="num">${wait}</span></div>
+      <div class="rp-row"><span class="ri">👩‍⚕️</span><div class="rt"><div class="rn">护士团队</div><div class="rv">治疗速度加成</div></div><span class="num">+${Math.round((nurseSpeed()-1)*100)}%</span></div>
+      <div class="rp-row"><span class="ri">🏠</span><div class="rt"><div class="rn">诊室数量</div><div class="rv">已解锁专科</div></div><span class="num">${Object.keys(G.rooms).length}/${ROOM_DEFS.length}</span></div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:10px;">
+      <button class="big-btn" id="resetBtn" style="background:#e2e8f0; color:#64748b;">♻️ 重新开始</button>
+    </div>
+  </div>`;
+  $('#modalRoot').innerHTML = `<div class="modal">${html}</div>`;
+  $('#repClose').onclick = closeModal;
+  $('#resetBtn').onclick = ()=>{ if(confirm('确定要清空进度、重新开始吗？')){ localStorage.removeItem('pet_hospital_v1'); location.reload(); } };
+}
+function closeModal(){ $('#modalRoot').innerHTML=''; }
+
+/* ================= 玩法说明 ================= */
+function openHelp(){
+  const items = [
+    ['🐾','生病宠物自动上门','各种宠物带着怪病来到候诊大厅排队'],
+    ['🩺','自动接诊治疗','有对应专科诊室和空位时，会自动把宠物送进去治疗'],
+    ['👆','点击加速','点击正在治疗的宠物，帮它加速康复'],
+    ['💰','治愈赚钱','治愈宠物赚金币、涨名声；宠物耐心耗尽会气走并扣名声'],
+    ['🏪','升级医院','解锁专科诊室 / 升级诊室（更多接诊位）/ 雇佣护士（全体提速）'],
+    ['🎯','每日目标','每天有治愈或赚钱目标，达成有金币奖励'],
+    ['✨','随机事件','偶发大客户双倍收入、急诊潮、VIP 等特殊事件'],
+    ['💡','小贴士','优先解锁能治当前排队宠物的诊室，别让它们等太久'],
+  ];
+  const rows = items.map(([ic,t,d])=>`<div class="rp-row"><span class="ri">${ic}</span><div class="rt"><div class="rn">${t}</div><div class="rv">${d}</div></div></div>`).join('');
+  $('#modalRoot').innerHTML = `<div class="modal"><div class="sheet"><button class="close" id="helpClose">✕</button><h2>📖 玩法说明</h2><div class="sub">李大师萌宠医院 · 宠物医院模拟器</div><div style="display:flex;flex-direction:column;gap:8px;">${rows}</div></div></div>`;
+  $('#helpClose').onclick = closeModal;
+}
+
+/* ================= 漂浮字 & toast ================= */
+function floater(p, text, cls){
+  const el = document.createElement('div');
+  el.className = 'floater ' + (cls||'gold');
+  el.textContent = text;
+  const f = $('#floaters');
+  let x = f.clientWidth/2, y = f.clientHeight/2;
+  if(p){
+    const src = $('#slot-'+p.id) || $('#qpet-'+p.id);
+    if(src){ const r = src.getBoundingClientRect(); const fr = f.getBoundingClientRect(); x = r.left-fr.left+r.width/2; y = r.top-fr.top; }
+  }
+  el.style.left = (x-20)+'px';
+  el.style.top = (y-10)+'px';
+  f.appendChild(el);
+  setTimeout(()=>el.remove(), 1200);
+}
+let toastTimer=null;
+function toast(msg, icon){
+  const t = $('#toast');
+  t.textContent = (icon?icon+' ':'')+msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ================= 存档 ================= */
+function save(){
+  try{ localStorage.setItem('pet_hospital_v1', JSON.stringify(G)); }catch(e){}
+}
+function load(){
+  try{
+    const s = localStorage.getItem('pet_hospital_v1');
+    if(s){ G = Object.assign(freshState(), JSON.parse(s)); return true; }
+  }catch(e){}
+  return false;
+}
+
+/* ================= 启动 ================= */
+function start(){
+  G = freshState();
+  setGoal();
+  $('#intro').style.display='none';
+  renderAll();
+  save();
+  openHelp(); // 首次开张自动弹出玩法说明，帮助玩家快速上手
+}
+
+$('#startBtn').onclick = start;
+$('#btnShop').onclick = ()=> G ? openShop() : null;
+$('#btnHelp').onclick = ()=> openHelp();
+$('#btnReport').onclick = ()=> G ? openReport() : null;
+
+// 恢复存档
+const hadSave = load();
+if(hadSave){
+  $('#intro').style.display='none';
+  renderAll();
+  toast('欢迎回来，继续经营！', '👋');
+}
+// 无存档时保持开场页，点击“开张营业”后再渲染
+
+setInterval(()=>{
+  if(!G) return;
+  const now = Date.now();
+  const dt = Math.min(0.5, (now-lastTime)/1000);
+  lastTime = now;
+  update(dt);
+  if(G) assignQueue();
+}, 150);
+</script>
+</body>
+</html>
