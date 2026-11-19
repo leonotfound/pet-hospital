@@ -94,6 +94,13 @@ body{
 .pet .lock-tag.lockable{color:#b45309; background:#fffbeb; border-color:#fde68a;}
 .pet .bubble{margin-left:auto; font-size:11px; color:#0f766e; background:#ccfbf1; border-radius:10px; padding:4px 8px; white-space:nowrap; font-weight:600;}
 .empty-hint{text-align:center; color:#94a3b8; font-size:12.5px; padding:18px 0;}
+/* ===== 拖拽接诊 ===== */
+.pet{touch-action:none; -webkit-user-select:none; user-select:none; cursor:grab;}
+.pet.dragging{opacity:.35;}
+.pet.drag-hint{outline:2px dashed #0ea5e9; outline-offset:-2px;}
+.drag-ghost{position:fixed; width:46px; height:46px; border-radius:14px; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,.28); display:flex; align-items:center; justify-content:center; font-size:30px; pointer-events:none; z-index:999; transform:translate(-50%,-50%);}
+.room.drop-ok{outline:3px solid #10b981; outline-offset:2px; box-shadow:0 0 0 5px rgba(16,185,129,.18); background:#f0fdf4;}
+.room.drop-bad{outline:3px dashed #f43f5e; outline-offset:2px;}
 /* ===== 底栏 ===== */
 #bottom{
   flex:none; display:flex; gap:10px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
@@ -219,7 +226,7 @@ body{
       <div class="tag">宠物医院模拟器 · 致敬《双点医院》</div>
       <div class="how">
         🐾 生病的宠物会自己上门排队<br>
-        🩺 有空诊室时<b>自动接诊治疗</b><br>
+        🫳 <b>拖拽</b>候诊宠物到对应诊室治疗<br>
         👆 点击治疗中的宠物可<b>加速治疗</b><br>
         💰 治愈赚金币，<b>解锁专科诊室</b>、升级、雇护士<br>
         ⏳ 宠物<b>耐心耗尽会生气离开</b>，扣名声哦
@@ -269,7 +276,7 @@ function freshState(){
     queue: [], treating: [],
     goal: {type:'cure', target:3, done:0, reward:120},
     goalDone: false,
-    spawnTimer: 1.5, dayTimer: 0, dayLen: 55,
+    spawnTimer: 1.5, dayTimer: 0, dayLen: 70,
     eventActive: null, eventTimer: 0,
     petSeq: 1,
     unlockedTeaser: false
@@ -292,6 +299,8 @@ function weighted(items){ // items: [{w:number}]
 }
 
 /* ================= 治疗相关 ================= */
+// 治疗时长倍率：数值越大治疗越慢（1=原始，2=时长翻倍）
+const TREAT_SCALE = 2;
 function nurseSpeed(){ return 1 + G.nurses*0.22; }
 function roomSpeed(id){ const lv = roomLv(id); return 1 + (lv-1)*0.15; }
 function slotCount(id){ return 1 + (roomLv(id)-1); } // 每升一级 +1 接诊位
@@ -341,7 +350,7 @@ function update(dt){
     G.spawnTimer = base * rnd(0.7,1.3);
   }
   // 候诊耐心下降
-  const patienceRate = (G.eventActive === 'quiet') ? 3.2 * 0.4 : 3.2; // 午休：耐心下降变慢
+  const patienceRate = (G.eventActive === 'quiet') ? 2.5 * 0.4 : 2.5; // 午休：耐心下降变慢
   for(let i=G.queue.length-1;i>=0;i--){
     const p = G.queue[i];
     p.patience -= dt * patienceRate;
@@ -356,7 +365,7 @@ function update(dt){
   // 治疗进度
   for(let i=G.treating.length-1;i>=0;i--){
     const t = G.treating[i];
-    t.progress += dt * (1 / (t.base / (roomSpeed(t.room) * nurseSpeed())));
+    t.progress += dt * (1 / ((t.base * TREAT_SCALE) / (roomSpeed(t.room) * nurseSpeed())));
     if(t.progress >= 1){
       G.treating.splice(i,1);
       completeTreatment(t);
@@ -545,9 +554,9 @@ function renderQueue(){
         const rd = ROOM_DEFS.find(r=>r.id===p.room);
         right = `<span class="lock-tag lockable" id="q-unlock-${p.id}">🔒 需${rd.name}</span>`;
       }else{
-        right = `<span class="bubble">${DISEASES.find(d=>d.id===p.dz).room===p.room?'等待接诊':'排队中'}</span>`;
+        right = `<span class="bubble">🫳 拖到诊室</span>`;
       }
-      html += `<div class="pet" id="qpet-${p.id}">
+      html += `<div class="pet" id="qpet-${p.id}" data-pid="${p.id}">
         <div class="avatar">${p.e}<span class="dz">${p.dzIcon}</span></div>
         <div class="info">
           <div class="nm">${p.n}</div>
@@ -563,6 +572,9 @@ function renderQueue(){
         const b = $('#q-unlock-'+p.id);
         if(b) b.onclick = ()=>openShop();
       }
+      // 绑定拖拽（每次重绘后重新绑定）
+      const qel = $('#qpet-'+p.id);
+      if(qel) qel.addEventListener('pointerdown', e=>onPetDown(p, e));
     });
   }
   $('#queueCount').textContent = G.queue.length;
@@ -585,28 +597,115 @@ function refreshBars(){
   if(G.goal.type==='money') renderGoal();
 }
 
-/* ================= 接诊调度 ================= */
-function assignQueue(){
-  // 在 update 里已触发 render，这里简化：每次 update 结束后尝试接诊
-  for(const p of G.queue.slice()){
-    const roomId = p.room;
-    if(!roomUnlocked(roomId)) continue;
-    const cap = slotCount(roomId);
-    const used = G.treating.filter(t=>t.room===roomId).length;
-    if(used >= cap) continue;
-    const slot = firstFreeSlot(roomId, cap);
-    const idx = G.queue.indexOf(p);
-    G.queue.splice(idx,1);
-    const t = { ...p, room: roomId, slot, progress:0, boosts:0 };
-    G.treating.push(t);
-    renderAll();
-    break;
+/* ================= 接诊调度（手动拖拽） ================= */
+function admitPet(petId, roomId){
+  const idx = G.queue.findIndex(p=>p.id===petId);
+  if(idx < 0) return {ok:false, msg:''};
+  const p = G.queue[idx];
+  if(p.room !== roomId){
+    const rd = ROOM_DEFS.find(r=>r.id===p.room);
+    return {ok:false, msg:'这只宠物需要「'+(rd?rd.name:'专科诊室')+'」'};
   }
+  if(!roomUnlocked(roomId)) return {ok:false, msg:'该诊室还未解锁'};
+  const cap = slotCount(roomId);
+  const used = G.treating.filter(t=>t.room===roomId).length;
+  if(used >= cap) return {ok:false, msg:'该诊室已满，等有空位再拖'};
+  const slot = firstFreeSlot(roomId, cap);
+  G.queue.splice(idx,1);
+  const t = { ...p, room: roomId, slot, progress:0, boosts:0 };
+  G.treating.push(t);
+  renderAll();
+  save();
+  return {ok:true, msg:''};
 }
 function firstFreeSlot(roomId, cap){
   const usedSlots = G.treating.filter(t=>t.room===roomId).map(t=>t.slot);
   for(let i=0;i<cap;i++) if(!usedSlots.includes(i)) return i;
   return 0;
+}
+
+/* ================= 拖拽交互 ================= */
+let drag = null;
+function onPetDown(p, e){
+  if(e.button !== undefined && e.button !== 0) return; // 仅左键/单指
+  drag = { pid: p.id, sx: e.clientX, sy: e.clientY, moved: false, ghost: null };
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', onDragUp);
+  window.addEventListener('pointercancel', onDragCancel);
+  e.preventDefault();
+}
+function onDragMove(e){
+  if(!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if(!drag.moved){
+    if(Math.hypot(dx,dy) < 10) return; // 超过阈值才进入拖拽
+    drag.moved = true;
+    const src = $('#qpet-'+drag.pid);
+    if(src) src.classList.add('dragging');
+    drag.ghost = document.createElement('div');
+    drag.ghost.className = 'drag-ghost';
+    const p = G.queue.find(x=>x.id===drag.pid);
+    drag.ghost.textContent = p ? p.e : '🐾';
+    document.body.appendChild(drag.ghost);
+    highlightRooms(p);
+  }
+  if(drag.ghost){
+    drag.ghost.style.left = e.clientX + 'px';
+    drag.ghost.style.top = e.clientY + 'px';
+  }
+  updateDropTarget(e.clientX, e.clientY);
+}
+function onDragUp(e){
+  if(!drag){ cleanupDrag(); return; }
+  if(drag.moved){
+    const roomEl = roomAtPoint(e.clientX, e.clientY);
+    const roomId = roomEl ? roomEl.dataset.room : null;
+    if(roomId){
+      const r = admitPet(drag.pid, roomId);
+      if(!r.ok && r.msg) toast(r.msg, '❌');
+    }
+  }
+  cleanupDrag();
+}
+function onDragCancel(){ cleanupDrag(); }
+function cleanupDrag(){
+  if(drag){
+    if(drag.ghost) drag.ghost.remove();
+    const src = $('#qpet-'+drag.pid);
+    if(src) src.classList.remove('dragging');
+  }
+  clearRoomHighlights();
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragUp);
+  window.removeEventListener('pointercancel', onDragCancel);
+  drag = null;
+}
+function highlightRooms(p){
+  if(!p) return;
+  ROOM_DEFS.forEach(rd=>{
+    const el = $('#room-'+rd.id);
+    if(!el || !roomUnlocked(rd.id)) return;
+    const cap = slotCount(rd.id);
+    const used = G.treating.filter(t=>t.room===rd.id).length;
+    if(rd.id === p.room && used < cap) el.classList.add('drop-ok');
+  });
+}
+function clearRoomHighlights(){
+  ROOM_DEFS.forEach(rd=>{
+    const el = $('#room-'+rd.id);
+    if(el) el.classList.remove('drop-ok','drop-bad');
+  });
+}
+function updateDropTarget(x, y){
+  const roomEl = roomAtPoint(x, y);
+  if(roomEl){
+    const p = G.queue.find(q=>q.id===drag.pid);
+    if(p && roomEl.dataset.room !== p.room) roomEl.classList.add('drop-bad');
+  }
+}
+function roomAtPoint(x, y){
+  const el = document.elementFromPoint(x, y);
+  return (el && el.closest) ? el.closest('.room') : null;
 }
 
 /* ================= 商店 ================= */
@@ -700,7 +799,7 @@ function closeModal(){ $('#modalRoot').innerHTML=''; }
 function openHelp(){
   const items = [
     ['🐾','生病宠物自动上门','各种宠物带着怪病来到候诊大厅排队'],
-    ['🩺','自动接诊治疗','有对应专科诊室和空位时，会自动把宠物送进去治疗'],
+    ['🫳','拖拽接诊','按住候诊宠物，拖到对应的专科诊室即可开始治疗（拖错或诊室满了会提示）'],
     ['👆','点击加速','点击正在治疗的宠物，帮它加速康复'],
     ['💰','治愈赚钱','治愈宠物赚金币、涨名声；宠物耐心耗尽会气走并扣名声'],
     ['🏪','升级医院','解锁专科诊室 / 升级诊室（更多接诊位）/ 雇佣护士（全体提速）'],
@@ -780,7 +879,6 @@ setInterval(()=>{
   const dt = Math.min(0.5, (now-lastTime)/1000);
   lastTime = now;
   update(dt);
-  if(G) assignQueue();
 }, 150);
 </script>
 </body>
